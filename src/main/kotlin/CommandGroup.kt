@@ -1,0 +1,1 @@
+data class CommandGroup(val file: String, val context: String, val commands: Map<String, String>)
