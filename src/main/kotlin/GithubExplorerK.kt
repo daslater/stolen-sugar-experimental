@@ -12,13 +12,15 @@ import java.util.*
 
 class GithubExplorerK {
     private val watchFiles: MutableSet<String>
-    private val baseCommands: MutableMap<String, Command>
+    private val baseInvocationMap: MutableMap<String, Command>
+    private val baseTargetMap: MutableMap<String, Command>
     private val changedWords: MutableMap<String, String>
     private val gson: Gson
 
     init {
         watchFiles = HashSet()
-        baseCommands = HashMap()
+        baseInvocationMap = HashMap()
+        baseTargetMap = HashMap()
         changedWords = HashMap()
         gson = GsonBuilder().setPrettyPrinting().create()
     }
@@ -29,10 +31,9 @@ class GithubExplorerK {
         val github = GitHubBuilder.fromPropertyFile().build()
 
         val talonRepo = github.getRepository("knausj85/knausj_talon")
-        val baseCommits = talonRepo.queryCommits()
+        val baseCommitShas = talonRepo.queryCommits()
             .pageSize(100)
             .list()
-        val baseCommitShas = baseCommits
             .map { x: GHCommit -> x.shA1 }
             .toSet()
 
@@ -46,6 +47,8 @@ class GithubExplorerK {
             if (commit.shA1 !in baseCommitShas) {
                 for (commitFile in commit.files) {
                     if (watchFiles.contains(commitFile.fileName)) {
+                        println(commitFile.fileName)
+                        println(commit.author.login)
                         println(commitFile.patch)
                         println("-------------------------------------------------------------------------")
                         analyzeCommitFile(commitFile)
@@ -65,7 +68,7 @@ class GithubExplorerK {
         for ((file, context, commands) in commandGroups) {
             watchFiles.add(file)
             for (invocation in commands.keys) {
-                baseCommands[invocation] = Command(
+                baseInvocationMap[invocation] = Command(
                     commands[invocation]!!, invocation,
                     file, context
                 )
@@ -75,37 +78,17 @@ class GithubExplorerK {
 
     private fun analyzeCommitFile(commitFile: GHCommit.File) {
         val patch = commitFile.patch
-        val lines = patch.split("\\n".toRegex()).toTypedArray()
+        val lines = patch.split("\\n".toRegex())
+            .filter { it.startsWith("+") || it.startsWith("-") }
 
+
+        if (commitFile.fileName.endsWith(".py")) {
+
+        }
 
 
         for (i in 1 until lines.size) {
-            if (lines[i - 1].startsWith("-") && lines[i].startsWith("+")) {
-                val oldWords = lines[i - 1].split(" ".toRegex()).toTypedArray()
-                val newWords = lines[i].split(" ".toRegex()).toTypedArray()
-                if (oldWords.size != newWords.size) {
-                    continue
-                }
-                var index = 0
-                while (index < oldWords.size) {
-                    val relIndex = Arrays.mismatch(oldWords, index, oldWords.size, newWords, index, newWords.size)
-                    index += if (relIndex != -1) {
-                        relIndex
-                    } else {
-                        break
-                    }
-                    val oldWord = stripWord(oldWords[index])
-                    val newWord = stripWord(newWords[index])
-                    if (baseCommands.containsKey(oldWord) && baseCommands[oldWord]!!.file == commitFile.fileName) {
-                        changedWords[oldWord] = newWord
-                    }
-                    index++
-                }
-            }
-        }
-    }
 
-    private fun stripWord(word: String): String {
-        return word.filter { Character.isLetter(it) }
+        }
     }
 }
