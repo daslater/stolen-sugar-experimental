@@ -3,23 +3,21 @@ import java.nio.file.Path
 
 fun parseTalon() {
 
-//    val lines = talon.split("\\n".toRegex())
-//        .filter { it[0] != '#' && !it.startsWith("tag") && !it.startsWith("settings") }
     val talon = Files.readString(Path.of("src/main/resources/eclipse.talon"))
-    val commands = "^[a-z A-Z._<>()|^$\\[\\]]+ *:.*$(?:\\n^( +)\\S.*\$(?:\\n^\\1\\S.*\$)*)?".toRegex(RegexOption.MULTILINE).findAll(talon)
 
-//    (?:(\n +)\S+$)??(?:\1.*$)*
+    // Matches metadata at the top of a .talon file up to and including the single hyphen line "-"
+    val talonMetadata = Regex("(?sm).*^-$")
 
-    for (command in commands) {
-        println(command.value)
-    }
+    // Matches single or multiline Talon voice commands in a .talon file
+    val talonCommandRegex = Regex(
+        "(?m)^[a-z A-Z._<>{}()|^$\\[\\]]+(?<!\\(\\)):.*(?:\\R([ \\t]+)\\S.*(?:\\R\\1\\S.*\$)*)?")
 
+    val commands = talonCommandRegex
+        .findAll(talon.stripLeft(talonMetadata))
+        .map { it.value }
 
-//    /
-//    ^(\s*)\S.*$    #Find a line with some number of spaces
-//    (?:^\1\S.*$)*  #Find more lines with the same starting spaces
-//    ^.*$           #This is the line you want here
-//    /xm            #x to ignore whitespace in the regex.
-//    #m to have ^and $ match all lines
+    for (command in commands) println(command)
+
 
 }
+
