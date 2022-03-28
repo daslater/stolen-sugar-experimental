@@ -7,14 +7,22 @@ fun processTalon(talon: String): MutableMap<String, String> {
     val talonMetadata = Regex("(?sm).*^-$")
 
     // Matches single or multiline Talon voice commands in a .talon file
-    val talonCommandRegex = Regex("(?m)^[a-z A-Z._<>{}()|^$\\[\\]]+(?<!\\(\\)):.*(?:\\R([ \\t]+)\\S.*(?:\\R\\1\\S.*\$)*)?")
+    val talonCommandRegex =
+        Regex("(?m)^[a-z A-Z._<>{}()|^$\\[\\]]+(?<!\\(\\)):.*(?:\\R([ \\t]+)\\S.*(?:\\R\\1\\S.*\$)*)?")
 
     return talonCommandRegex
-        .findAll(talon.stripLeft(talonMetadata))
-        .map { it.value.split(Regex(": *\\R?")) }
+        .findAll(talon.removePrefix(talonMetadata))
+        .map { it.value.splitFirst(Regex(": *\\R?")) }
         .associateTo(mutableMapOf()) {
-            Pair(it[0].removePrefix("^").removeSuffix("$"),
-                it[1].trimIndent()) }
+            Pair(it[0]
+                .removePrefix("^")
+                .removeSuffix("$"),
+                it[1]
+                    .trimIndent()
+                    .lines()
+                    .filterNot { it.startsWith("#") }
+                    .joinToString(separator = "\n"))
+        }
 }
 
 

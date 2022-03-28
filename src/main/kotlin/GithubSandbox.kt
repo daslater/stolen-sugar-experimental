@@ -5,18 +5,17 @@ import org.kohsuke.github.*
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.*
-import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 import kotlin.collections.HashSet
 
-class GithubExplorerK {
+class GithubSandbox {
     private val watchFiles: MutableSet<String>
     private val baseInvocationMap: MutableMap<String, Command>
     private val baseTargetMap: MutableMap<String, Command>
-    private val changedWords: MutableMap<String, String>
+    private val changedWords: MutableMap<String, MutableMap<String, String>>
     private val talonFilesProcessed: MutableSet<String>
     private val commandGroups: HashSet<CommandGroup>
-    private var commandGroupMap: MutableMap<String, Map<String, String>>
+    private var commandGroupMap: MutableMap<String, CommandMap>
     private val github: GitHub
     private val gson: Gson
 
@@ -73,7 +72,10 @@ class GithubExplorerK {
     private fun populate() {
         for ((file, context, commands) in commandGroups) {
             watchFiles.add(file)
-            commandGroupMap[file] = commands
+            val targetMap = commands
+                .map { (k, v) -> Pair(v, k) }
+                .toMap()
+            commandGroupMap[file] = CommandMap(invocationMap = commands, targetMap = targetMap)
             for (invocation in commands.keys) {
                 baseInvocationMap[invocation] = Command(
                     commands[invocation]!!, invocation,
@@ -86,7 +88,7 @@ class GithubExplorerK {
     private fun analyzeCommitFile(commitFile: GHCommit.File) {
         val patch = commitFile.patch
         val lines = patch.split("\\n".toRegex())
-            .filter { it.startsWith("+", "-") }
+            .filter { it.startsWith(listOf("+", "-")) }
 
 
 
@@ -100,36 +102,46 @@ class GithubExplorerK {
         println(talon.path)
         println("--------------------------------------")
         val talonCommands = processTalon(String(talon.read().readAllBytes()))
-        val baseCommands = commandGroupMap[talon.path]
+        val baseTargets = commandGroupMap[talon.path]!!.targetMap
+        val baseInvocations = commandGroupMap[talon.path]!!.invocationMap
+        val localChanges: MutableMap<String, String> = HashMap()
 
         println("Talon Commands")
-        println(talonCommands)
+        println(gson.toJson(talonCommands))
         println("--------------------------------------")
         println("Base Commands")
-        println(baseCommands)
+        println(gson.toJson(baseInvocations))
         println("--------------------------------------")
-        println("Base commands same? ${baseCommands == talonCommands}")
+        println("Base commands same? ${baseInvocations == talonCommands}")
         println("Differences:")
-        for ((key, value) in baseCommands!!.iterator()) {
-            if (!talonCommands.containsKey(key)) {
-                println("${key}: ${value}")
+        println("Old:")
+        for ((k, v) in (baseInvocations.entries - talonCommands.entries)) {
+            println("$k: $v")
+        }
+        println("New: ")
+        for ((k, v) in (talonCommands.entries - baseInvocations.entries)) {
+            println("$k: $v")
+        }
+        for ((key, value) in talonCommands.iterator()) {
+            if (!baseInvocations.containsKey(key)) {
+//                println("Old: ${baseTargets.getOrDefault(value, "")}")
+//                println("New: ${key}")
+                if (baseTargets.containsKey(value)) {
+                    val oldWord: String = baseTargets.getOrDefault(value, "")
+                    val newWord = key
+                    localChanges[oldWord] = newWord
+                }
             }
         }
-        for ((key, value) in talonCommands!!.iterator()) {
-            if (!baseCommands.containsKey(key)) {
-                println("${key}: ${value}")
-            }
-        }
-        println("--------------------------------------")
-        println("--------------------------------------")
-        println("--------------------------------------")
 
-//        for (key in baseCommands!!.keys) {
-//            talonCommands.remove(key)
-//        }
+        changedWords[talon.path] = localChanges
 
-//        for ((key, value) in talonCommands) {
-//            changedWords[baseTargetMap[value]?.invocation ?: ""] = key
-//        }
+        println("--------------------------------------")
+        println("--------------------------------------")
+        println("--------------------------------------")
+    }
+
+    private fun analyzePython(commitFile: GHCommit.File) {
+
     }
 }
